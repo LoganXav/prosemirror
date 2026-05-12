@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProseMirror Redux-Style Example</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-view/style/prosemirror.css"
+    />
+
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+      }
+
+      #editor {
+        border: 1px solid #ccc;
+        padding: 16px;
+        min-height: 200px;
+        margin-top: 20px;
+      }
+
+      .controls {
+        margin: 20px 0;
+        display: flex;
+        gap: 12px;
+      }
+
+      button {
+        padding: 10px 16px;
+        border: 1px solid #ccc;
+        background: white;
+        cursor: pointer;
+      }
+
+      .navigation {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      button:hover {
+        background: #f5f5f5;
+      }
+
+      #ai-status {
+        font-weight: bold;
+        margin-top: 22px;
+        padding: 5px;
+      }
+
+      #content {
+        display: none;
+      }
+
+      .ProseMirror:focus {
+        outline: none; /* Removes the default focus outline */
+        box-shadow: none; /* Removes any potential box-shadow on focus */
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="content-wrapper">
+      <h3>Custom NodeView and AppState transactions</h3>
+
+      <div class="navigation">
+        <a href="/">Home</a>
+        <a href="/basic-editor">Basic Editor</a>
+        <a href="dinos-editor">Dinos Editor</a>
+        <a href="/markdown-editor">Markdown Editor</a>
+        <a href="/tooltip-editor">Tooltip Editor</a>
+        <a href="/ai-editor">AI Editor</a>
+        <a href="/vim-editor">Vim Editor</a>
+      </div>
+
+      <div id="editor"></div>
+
+      <div id="content">
+        <h4>This is just dummy content</h4>
+        <p></p>
+        <p>This content is parsed into the initial editor state.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="start-ai">Start AI</button>
+      <button id="stop-ai">Stop AI</button>
+    </div>
+    <p>Type in the editor. If AI is "generating", typing will cancel it.</p>
+    <div id="ai-status">AI Status: idle</div>
+
+    <script type="module" src="/index.js"></script>
+  </body>
+</html>

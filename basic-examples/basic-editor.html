@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProseMirror Redux-Style Example</title>
+
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-view/style/prosemirror.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-view/style/prosemirror.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-menu/style/menu.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-example-setup/style/style.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/prosemirror-gapcursor/style/gapcursor.css"
+    />
+
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+
+      .navigation {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      #editor {
+        border: 1px solid #ccc;
+        padding: 16px;
+        min-height: 200px;
+        margin-top: 20px;
+      }
+
+      #content {
+        display: none;
+      }
+
+      .ProseMirror:focus {
+        outline: none; /* Removes the default focus outline */
+        box-shadow: none; /* Removes any potential box-shadow on focus */
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="content-wrapper">
+      <h3>Basic ProseMirror Example</h3>
+      <div class="navigation">
+        <a href="/">Home</a>
+        <a href="/basic-editor">Basic Editor</a>
+        <a href="dinos-editor">Dinos Editor</a>
+        <a href="/markdown-editor">Markdown Editor</a>
+        <a href="/tooltip-editor">Tooltip Editor</a>
+        <a href="/vim-editor">Vim Editor</a>
+      </div>
+
+      <div id="editor">
+        <div id="content">
+          <h1 style="color: red">This is an H1</h1>
+          <h2>This is an H2</h2>
+          <p>This is a paragraph</p>
+          <p>
+            <em>This is in italic</em>
+          </p>
+          <p>
+            <i>Also in italic</i>
+          </p>
+          <p>
+            <a href="#" title="dummy-link">Link</a>
+          </p>
+          <ul>
+            <li>Hello kind sir</li>
+            <li></li>
+          </ul>
+          <ol start="5">
+            <li>Hello sir</li>
+            <li></li>
+          </ol>
+          This is an ordinary text
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/basic-editor.js"></script>
+  </body>
+</html>
