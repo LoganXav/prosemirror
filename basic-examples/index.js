@@ -324,6 +324,7 @@ document.querySelector("#nested-replace").addEventListener("click", () => {
 // render();
 //
 
+// full document recursive traversal
 let count = 0;
 let positions = {};
 appState.editor.doc.descendants((node, pos, parent) => {
@@ -332,6 +333,7 @@ appState.editor.doc.descendants((node, pos, parent) => {
     parent.type !== extendedBasicSchema.nodes.blockquote
   ) {
     count++;
+    // keep in mind the pos is the one before the node's opening token
     const $from = appState.editor.doc.resolve(pos + 1);
     positions[count] = {
       startingFrom: $from.start(),
@@ -343,6 +345,7 @@ appState.editor.doc.descendants((node, pos, parent) => {
 });
 // console.log({ count, positions });
 
+// ranged recursive traversal
 appState.editor.doc.nodesBetween(30, 80, (node, pos) => {
   if (
     node.isInline &&
@@ -354,3 +357,10 @@ appState.editor.doc.nodesBetween(30, 80, (node, pos) => {
   // if i prune here, since the isInline will always be false for the first block layers,
   // we will always prune and never get to the texts
 });
+
+// only checks a node's children the block level nodes
+appState.editor.doc.resolve(28).nodeAfter.forEach((child, offset, index) => {
+  console.log(`child ${index}: ${child.type.name} at offset ${offset}`);
+});
+
+console.log(appState.editor.doc.resolve(28).nodeAfter);
