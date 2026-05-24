@@ -322,3 +322,21 @@ document.querySelector("#nested-replace").addEventListener("click", () => {
 
 // initial app render
 // render();
+//
+
+let count = 0;
+let positions = {};
+appState.editor.doc.descendants((node, pos, parent) => {
+  if (
+    node.type === extendedBasicSchema.nodes.paragraph &&
+    parent.type !== extendedBasicSchema.nodes.blockquote
+  ) {
+    count++;
+    const $from = appState.editor.doc.resolve(pos + 1);
+    positions[count] = {
+      startingFrom: $from.start(),
+      endingAt: $from.end(),
+    };
+  }
+});
+console.log({ count, positions });
