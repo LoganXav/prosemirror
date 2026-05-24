@@ -338,5 +338,19 @@ appState.editor.doc.descendants((node, pos, parent) => {
       endingAt: $from.end(),
     };
   }
+  // don't look futher into the nodes subtree for performance
+  return false;
 });
-console.log({ count, positions });
+// console.log({ count, positions });
+
+appState.editor.doc.nodesBetween(30, 80, (node, pos) => {
+  if (
+    node.isInline &&
+    node.marks.some((mark) => mark.type === extendedBasicSchema.marks.strong)
+  ) {
+    console.log(node.text);
+  }
+  // cant prune here because we are looking for lower level inline content.
+  // if i prune here, since the isInline will always be false for the first block layers,
+  // we will always prune and never get to the texts
+});
