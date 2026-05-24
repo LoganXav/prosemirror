@@ -1,7 +1,8 @@
 import { EditorState, Plugin } from "prosemirror-state";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { schema } from "prosemirror-schema-basic";
-import { DOMParser } from "prosemirror-model";
+import { DOMParser, Fragment, Schema, Slice } from "prosemirror-model";
+import { AddMarkStep, ReplaceStep } from "prosemirror-transform";
 
 // This is a VERY small Redux-style ProseMirror architecture.
 // Goal: The editor does NOT update itself directly but uses one central `dispatch()` function to handle app state updates and editor transactions.
@@ -10,7 +11,6 @@ let specklePlugin = new Plugin({
   state: {
     init(_, { doc }) {
       let speckles = [];
-      console.log({ doc });
       for (let pos = 1; pos < doc.content.size; pos += 4)
         speckles.push(
           Decoration.inline(pos - 3, pos, { style: "background: yellow" }),
@@ -28,11 +28,85 @@ let specklePlugin = new Plugin({
   },
 });
 
+// Resolved position examples plugin.
+// state.selection.$from and $to are already resolved positions — no need to call doc.resolve() manually.
+// This plugin reads $from on every state update to show cursor context in a status bar.
+let cursorContextPlugin = new Plugin({
+  view(editorView) {
+    const status = document.createElement("div");
+    status.id = "cursor-context";
+    status.style.cssText =
+      "padding: 6px 10px; font-size: 12px; color: #444; border: 1px solid #ddd; margin-top: 8px; font-family: monospace;";
+    editorView.dom.parentNode.appendChild(status);
+
+    function update(view) {
+      const { $from, $cursor } = view.state.selection;
+
+      // Build the ancestor path from doc down to the cursor's parent
+      const path = [];
+      let ancestorBefore = 0;
+      let ancestorAfter = 0;
+      for (let d = 0; d <= $from.depth; d++) {
+        path.push($from.node(d).type.name);
+
+        if (d !== 0) {
+          ancestorBefore = $from.before(d);
+          ancestorAfter = $from.after(d);
+        }
+      }
+
+      // $from.parent is the immediate containing node (same as $from.node($from.depth))
+      const parent = $from.parent.type.name;
+
+      // $from.textOffset is how far into the current text node the cursor is
+      const textOffset = $from.textOffset;
+
+      // $from.start() and $from.end() give the absolute positions bounding the parent node
+      const parentStart = $from.start();
+      const parentEnd = $from.end();
+
+      // nodeBefore/nodeAfter are the nodes immediately before/after the cursor within the parent
+      const before = $from.nodeBefore ? $from.nodeBefore.type.name : "none";
+      const after = $from.nodeAfter ? $from.nodeAfter.type.name : "none";
+
+      status.innerHTML = `
+        <b>path:</b> ${path.join(" &rsaquo; ")} |
+        <b>pos:</b> ${$from.pos} |
+
+        <b>parent:</b> ${parent} |
+        <b>depth:</b> ${$from.depth} |
+        <b>textOffset:</b> ${textOffset} |
+        <b>parentStart:</b> ${parentStart} |
+        <b>parentEnd:</b> ${parentEnd} |
+        <b>ancestorBefore:</b> ${ancestorBefore} |
+        <b>ancestorAfter:</b> ${ancestorAfter} |
+        <b>nodeBefore:</b> ${before} |
+        <b>nodeAfter:</b> ${after}
+      `;
+    }
+
+    update(editorView);
+    return { update };
+  },
+});
+
+//   nodes: addListNodes(schema.spec.nodes, "paragraph block*", "block"),
+// const extendedBasicSchema = new Schema({
+//   marks: schema.spec.marks,
+// });
+
+const extendedBasicSchema = new Schema({
+  nodes: schema.spec.nodes,
+  marks: schema.spec.marks,
+});
+
 let appState = {
   editor: EditorState.create({
-    schema,
-    doc: DOMParser.fromSchema(schema).parse(document.querySelector("#content")),
-    plugins: [specklePlugin],
+    schema: extendedBasicSchema,
+    doc: DOMParser.fromSchema(extendedBasicSchema).parse(
+      document.querySelector("#content"),
+    ),
+    plugins: [specklePlugin, cursorContextPlugin],
   }),
 
   // non-editor app state
@@ -66,6 +140,92 @@ function dispatch(action) {
 
     case "AI_STOP": {
       appState.aiGeneratiionStatus = "idle";
+      break;
+    }
+
+    case "REPLACE": {
+      const tr = appState.editor.tr;
+      const textNode = schema.text(action.text);
+      const fragment = Fragment.from(textNode);
+      const slice = new Slice(fragment, 0, 0);
+
+      // const step = new ReplaceStep(
+      //   1,
+      //   5,
+      //   slice
+      // );
+      //
+      // tr.step(step);
+      //
+      // Using helper functions
+      // tr.replaceWith(1, 5, fragment);
+      // tr.delete(1, 5);
+      tr.replace(1, 5, slice);
+
+      appState.editor = appState.editor.apply(tr);
+      break;
+    }
+
+    case "NESTED_REPLACE": {
+      const doc = appState.editor.doc;
+      const tr = appState.editor.tr;
+
+      let fromPos = null;
+      let toPos = null;
+
+      doc.descendants((node, pos, parent) => {
+        if (
+          node.type.name === "paragraph" &&
+          parent.type.name === "doc" &&
+          fromPos === null
+        ) {
+          // cut mid-way into the first top-level paragraph
+          fromPos = pos + 1 + Math.floor(node.content.size / 2);
+        }
+        if (
+          node.type.name === "paragraph" &&
+          parent.type.name === "blockquote" &&
+          toPos === null
+        ) {
+          // cut mid-way into the paragraph inside the blockquote
+          toPos = pos + 1 + Math.floor(node.content.size / 2);
+        }
+      });
+
+      if (fromPos === null || toPos === null) break;
+
+      // fromPos is mid-paragraph → 1 node boundary was cut → openStart: 1
+      // toPos is mid-blockquote>paragraph → 2 node boundaries were cut → openEnd: 2
+      //
+      // The fragment mirrors that open structure:
+      //   first node: paragraph (open at start — merges with paragraph content before fromPos)
+      //   last node: blockquote > paragraph (open at end — merges with blockquote paragraph content after toPos)
+      const slice = new Slice(
+        Fragment.from([
+          schema.nodes.paragraph.create(null, schema.text("~inserted~")),
+          schema.nodes.blockquote.create(
+            null,
+            schema.nodes.paragraph.create(null, schema.text("~inserted~")),
+          ),
+        ]),
+        1, // openStart: paragraph boundary cut at the start
+        2, // openEnd: blockquote + paragraph boundaries cut at the end
+      );
+
+      tr.step(new ReplaceStep(fromPos, toPos, slice));
+      appState.editor = appState.editor.apply(tr);
+      break;
+    }
+    case "BOLD": {
+      const boldMark = appState.editor.schema.marks.strong.create();
+      const { $from, $to } = appState.editor.selection;
+
+      const tr = appState.editor.tr;
+
+      const step = new AddMarkStep($from.pos, $to.pos, boldMark);
+      tr.step(step);
+
+      appState.editor = appState.editor.apply(tr);
       break;
     }
 
@@ -131,6 +291,12 @@ const view = new EditorView(document.querySelector("#editor"), {
 });
 
 // app buttons
+document.querySelector("#bold").addEventListener("click", () => {
+  dispatch({
+    type: "BOLD",
+  });
+});
+
 document.querySelector("#start-ai").addEventListener("click", () => {
   dispatch({
     type: "AI_START",
@@ -141,6 +307,17 @@ document.querySelector("#stop-ai").addEventListener("click", () => {
   dispatch({
     type: "AI_STOP",
   });
+});
+
+document.querySelector("#replace").addEventListener("click", () => {
+  dispatch({
+    type: "REPLACE",
+    text: "Hello",
+  });
+});
+
+document.querySelector("#nested-replace").addEventListener("click", () => {
+  dispatch({ type: "NESTED_REPLACE" });
 });
 
 // initial app render

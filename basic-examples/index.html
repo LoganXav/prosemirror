@@ -86,14 +86,20 @@
       <div id="editor"></div>
 
       <div id="content">
-        <h4>This is just dummy content</h4>
-        <p></p>
-        <p>This content is parsed into the initial editor state.</p>
+        <p>First paragraph text here.</p>
+        <blockquote><p>Blockquote paragraph text here.</p></blockquote>
+        <p>Last paragraph text here.</p>
       </div>
     </div>
     <div class="controls">
+      <button id="bold">Bold</button>
       <button id="start-ai">Start AI</button>
       <button id="stop-ai">Stop AI</button>
+
+      <button id="replace">Replace first word with Hello</button>
+      <button id="nested-replace">
+        Nested Replace (openStart:1, openEnd:2)
+      </button>
     </div>
     <p>Type in the editor. If AI is "generating", typing will cancel it.</p>
     <div id="ai-status">AI Status: idle</div>

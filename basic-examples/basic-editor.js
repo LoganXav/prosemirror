@@ -171,6 +171,29 @@ const state = EditorState.create({
   // plugins: [],
 });
 
+const $pos = state.doc.resolve(107);
+
+console.log({
+  depth: $pos.depth,
+  parent: $pos.parent.type.name, // "paragraph"
+  textOffset: $pos.textOffset, // chars from start of current text run
+  nodeBefore: $pos.nodeBefore, // text node before cursor
+  nodeAfter: $pos.nodeAfter, // text node after cursor
+  textBefore: $pos.nodeBefore?.text, // actual string content before
+  textAfter: $pos.nodeAfter?.text, // actual string content after
+});
+
+console.log({
+  start: $pos.start($pos.depth),
+  startResol: state.doc.resolve($pos.start($pos.depth)),
+  end: $pos.end($pos.depth),
+  endResol: state.doc.resolve($pos.end($pos.depth)),
+});
+
+for (let d = 0; d <= $pos.depth; d++) {
+  console.log(`depth ${d}:`, $pos.node(d).type.name);
+}
+
 const view = new EditorView(document.querySelector("#editor"), {
   state,
 });
