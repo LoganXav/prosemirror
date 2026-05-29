@@ -40,6 +40,23 @@
         align-items: center;
       }
 
+      .controls {
+        margin: 20px 0;
+        display: flex;
+        gap: 12px;
+      }
+
+      button {
+        padding: 10px 16px;
+        border: 1px solid #ccc;
+        background: white;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #f5f5f5;
+      }
+
       #editor {
         border: 1px solid #ccc;
         padding: 16px;
@@ -69,6 +86,48 @@
       }
       .card .card-title {
         text-decoration: underline;
+      }
+
+      .callout {
+        border-left: 3px solid;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin: 1em 0;
+        position: relative;
+      }
+      .callout-info {
+        border-color: #4a90d9;
+        background: #eef5fd;
+      }
+      .callout-warning {
+        border-color: #e6a817;
+        background: #fdf8ee;
+      }
+      .callout-danger {
+        border-color: #d94a4a;
+        background: #fdeeed;
+      }
+
+      .callout-kind-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        border: 1px solid currentColor;
+        background: transparent;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .callout-title {
+        font-weight: 600;
+        margin: 0 0 6px;
+      }
+      .callout-body > * {
+        margin: 0;
       }
     </style>
   </head>
@@ -115,6 +174,7 @@
             <ul>
               <li>Hello</li>
             </ul>
+            <p>Hello in the card</p>
 
             <div class="card-body">
               <ol>
@@ -124,6 +184,10 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="controls">
+        <button id="card">Add a card</button>
       </div>
     </div>
 

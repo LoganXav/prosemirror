@@ -1,5 +1,11 @@
 import { exampleSetup } from "prosemirror-example-setup";
-import { DOMParser, Schema } from "prosemirror-model";
+import { keymap } from "prosemirror-keymap";
+import { AddMarkStep, ReplaceStep } from "prosemirror-transform";
+import { TextSelection } from "prosemirror-state";
+import { findWrapping } from "prosemirror-transform";
+
+import { DOMParser, Fragment, Schema, Slice } from "prosemirror-model";
+
 import { schema } from "prosemirror-schema-basic";
 import { addListNodes } from "prosemirror-schema-list";
 import { EditorState } from "prosemirror-state";
@@ -207,7 +213,46 @@ const marks = {
 // });
 
 const extendedBasicSchema = new Schema({
-  nodes,
+  nodes: schema.spec.nodes.append({
+    callout: {
+      group: "block",
+      content: "callout_title callout_body", // strict sequence, always both
+      attrs: {
+        kind: { default: "info" }, // info | warning | danger
+      },
+      toDOM(node) {
+        return [
+          "div",
+          {
+            class: `callout callout-${node.attrs.kind}`,
+            "data-kind": node.attrs.kind,
+          },
+          0,
+        ];
+      },
+      parseDOM: [
+        {
+          tag: "div.callout",
+          getAttrs: (dom) => ({
+            kind: dom.getAttribute("data-kind") || "info",
+          }),
+        },
+      ],
+    },
+
+    callout_title: {
+      content: "inline*",
+      defining: true, // copy-paste keeps this node intact
+      toDOM: () => ["p", { class: "callout-title" }, 0],
+      parseDOM: [{ tag: "p.callout-title" }],
+    },
+
+    callout_body: {
+      content: "block+", // one or more blocks — allows nested callouts
+      toDOM: () => ["div", { class: "callout-body" }, 0],
+      parseDOM: [{ tag: "div.callout-body" }],
+    },
+  }),
   // marks: schema.spec.marks,
   marks,
 });
@@ -216,12 +261,124 @@ const state = EditorState.create({
   doc: DOMParser.fromSchema(extendedBasicSchema).parse(
     document.querySelector("#content"),
   ),
-  plugins: exampleSetup({ schema: extendedBasicSchema }),
+  plugins: [
+    ...exampleSetup({ schema: extendedBasicSchema }),
+    keymap({
+      "Mod-Shift-c": insertCallout("info"),
+    }),
+  ],
   // plugins: [],
 });
 
 const view = new EditorView(document.querySelector("#editor"), {
   state,
+  nodeViews: {
+    callout: (node, view, getPos) => new CalloutNodeView(node, view, getPos),
+  },
 });
 
-console.log({ doc: state.doc });
+document.querySelector("#card").addEventListener("click", () => {
+  const tr = view.state.tr;
+
+  const slice = new Slice(
+    Fragment.from([
+      state.schema.nodes.card.create(
+        { kind: "info" },
+        Fragment.from([
+          state.schema.nodes.card_title.create(
+            null,
+            state.schema.text("This is my created card title"),
+          ),
+          state.schema.nodes.card_body.create(
+            null,
+            state.schema.nodes.paragraph.create(
+              null,
+              state.schema.text("This is my created card body"),
+            ),
+          ),
+        ]),
+      ),
+    ]),
+    0,
+    0,
+  );
+
+  const { $cursor } = view.state.selection;
+  // console.log({ currentPoos: $cursor.pos, after: $cursor.after(1) });
+
+  const insertPos = $cursor.after(1);
+  const step = new ReplaceStep(insertPos, insertPos, slice);
+  tr.step(step);
+  view.dispatch(tr);
+});
+
+class CalloutNodeView {
+  constructor(node, view, getPos) {
+    this.view = view;
+    this.getPos = getPos;
+
+    // Outer wrapper
+    this.dom = document.createElement("div");
+    this.dom.className = `callout callout-${node.attrs.kind}`;
+
+    // Kind selector — sits outside contentDOM, so PM ignores its mutations
+    this.kindBtn = document.createElement("button");
+    this.kindBtn.className = "callout-kind-btn";
+    this.kindBtn.textContent = node.attrs.kind;
+    this.kindBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // don't steal focus from editor
+      this.cycleKind();
+    });
+    this.dom.appendChild(this.kindBtn);
+
+    // contentDOM is where ProseMirror renders the title + body children
+    this.contentDOM = document.createElement("div");
+    this.contentDOM.className = "callout-content";
+    this.dom.appendChild(this.contentDOM);
+  }
+
+  cycleKind() {
+    const kinds = ["info", "warning", "danger"];
+    const current = this.view.state.doc.nodeAt(this.getPos()).attrs.kind;
+    const next = kinds[(kinds.indexOf(current) + 1) % kinds.length];
+
+    const tr = this.view.state.tr.setNodeMarkup(this.getPos(), null, {
+      kind: next,
+    });
+    this.view.dispatch(tr);
+  }
+
+  update(node) {
+    if (node.type.name !== "callout") return false;
+    this.dom.className = `callout callout-${node.attrs.kind}`;
+    this.kindBtn.textContent = node.attrs.kind;
+    return true;
+  }
+
+  // Prevent PM from re-rendering when the button is clicked
+  ignoreMutation(mutation) {
+    return this.kindBtn.contains(mutation.target);
+  }
+}
+
+function insertCallout(kind = "info") {
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    const calloutType = state.schema.nodes.callout;
+    const titleType = state.schema.nodes.callout_title;
+    const bodyType = state.schema.nodes.callout_body;
+    const paragraphType = state.schema.nodes.paragraph;
+
+    // Build: callout > callout_title (empty) + callout_body > paragraph (empty)
+    const title = titleType.create();
+    const body = bodyType.create(null, paragraphType.create());
+    const node = calloutType.create({ kind }, [title, body]);
+
+    const tr = state.tr.replaceSelectionWith(node);
+
+    // Move cursor inside the title
+    const titleStart = $from.pos + 2; // +1 for callout open, +1 for title open
+    dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(titleStart))));
+    return true;
+  };
+}
