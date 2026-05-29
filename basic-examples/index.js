@@ -1,4 +1,5 @@
 import { EditorState, Plugin } from "prosemirror-state";
+import { addListNodes } from "prosemirror-schema-list";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { schema } from "prosemirror-schema-basic";
 import { DOMParser, Fragment, Schema, Slice } from "prosemirror-model";
@@ -96,7 +97,8 @@ let cursorContextPlugin = new Plugin({
 // });
 
 const extendedBasicSchema = new Schema({
-  nodes: schema.spec.nodes,
+  // nodes: (schema.spec.nodes),
+  nodes: addListNodes(schema.spec.nodes, "paragraph block*", "block"),
   marks: schema.spec.marks,
 });
 
@@ -145,22 +147,18 @@ function dispatch(action) {
 
     case "REPLACE": {
       const tr = appState.editor.tr;
-      const textNode = schema.text(action.text);
+      const textNode = appState.editor.schema.text(action.text);
       const fragment = Fragment.from(textNode);
       const slice = new Slice(fragment, 0, 0);
 
-      // const step = new ReplaceStep(
-      //   1,
-      //   5,
-      //   slice
-      // );
-      //
-      // tr.step(step);
+      const step = new ReplaceStep(1, 6, slice);
+
+      tr.step(step);
       //
       // Using helper functions
       // tr.replaceWith(1, 5, fragment);
       // tr.delete(1, 5);
-      tr.replace(1, 5, slice);
+      // tr.replace(1, 5, slice);
 
       appState.editor = appState.editor.apply(tr);
       break;
@@ -173,22 +171,25 @@ function dispatch(action) {
       let fromPos = null;
       let toPos = null;
 
+      let listItemCount = 0;
+
       doc.descendants((node, pos, parent) => {
         if (
           node.type.name === "paragraph" &&
-          parent.type.name === "doc" &&
+          parent.type.name === "blockquote" &&
           fromPos === null
         ) {
-          // cut mid-way into the first top-level paragraph
           fromPos = pos + 1 + Math.floor(node.content.size / 2);
         }
         if (
-          node.type.name === "paragraph" &&
-          parent.type.name === "blockquote" &&
+          node.type.name === "list_item" &&
+          parent.type.name === "ordered_list" &&
           toPos === null
         ) {
-          // cut mid-way into the paragraph inside the blockquote
-          toPos = pos + 1 + Math.floor(node.content.size / 2);
+          listItemCount++;
+          if (listItemCount === 2) {
+            toPos = pos + 1 + Math.floor(node.content.size / 2);
+          }
         }
       });
 
@@ -202,14 +203,26 @@ function dispatch(action) {
       //   last node: blockquote > paragraph (open at end — merges with blockquote paragraph content after toPos)
       const slice = new Slice(
         Fragment.from([
-          schema.nodes.paragraph.create(null, schema.text("~inserted~")),
-          schema.nodes.blockquote.create(
+          appState.editor.schema.nodes.blockquote.create(
             null,
-            schema.nodes.paragraph.create(null, schema.text("~inserted~")),
+            appState.editor.schema.nodes.paragraph.create(
+              null,
+              appState.editor.schema.text("~inserted~"),
+            ),
+          ),
+          appState.editor.schema.nodes.ordered_list.create(
+            null,
+            appState.editor.schema.nodes.list_item.create(
+              null,
+              appState.editor.schema.nodes.paragraph.create(
+                null,
+                appState.editor.schema.text("~inserted~"),
+              ),
+            ),
           ),
         ]),
-        1, // openStart: paragraph boundary cut at the start
-        2, // openEnd: blockquote + paragraph boundaries cut at the end
+        2, // openStart: paragraph boundary cut at the start
+        3, // openEnd: blockquote + paragraph boundaries cut at the end
       );
 
       tr.step(new ReplaceStep(fromPos, toPos, slice));
@@ -346,21 +359,23 @@ appState.editor.doc.descendants((node, pos, parent) => {
 // console.log({ count, positions });
 
 // ranged recursive traversal
-appState.editor.doc.nodesBetween(30, 80, (node, pos) => {
+appState.editor.doc.nodesBetween(60, 170, (node, pos) => {
   if (
     node.isInline &&
     node.marks.some((mark) => mark.type === extendedBasicSchema.marks.strong)
   ) {
-    console.log(node.text);
+    console.log({ boldedText: node.text });
   }
   // cant prune here because we are looking for lower level inline content.
   // if i prune here, since the isInline will always be false for the first block layers,
   // we will always prune and never get to the texts
 });
 
-// only checks a node's children the block level nodes
-appState.editor.doc.resolve(28).nodeAfter.forEach((child, offset, index) => {
-  console.log(`child ${index}: ${child.type.name} at offset ${offset}`);
+// only checks a node's direct children
+appState.editor.doc.resolve(97).nodeAfter.forEach((child, offset, index) => {
+  console.log(
+    `child ${index}: ${child.type.name} at offset ${offset} from the start of the node`,
+  );
 });
 
-console.log(appState.editor.doc.resolve(28).nodeAfter);
+// console.log(appState.editor.doc.resolve(28).nodeAfter);

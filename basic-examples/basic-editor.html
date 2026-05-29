@@ -55,6 +55,21 @@
         outline: none; /* Removes the default focus outline */
         box-shadow: none; /* Removes any potential box-shadow on focus */
       }
+
+      .card {
+        padding: 10px 20px;
+        border-radius: 20px;
+      }
+      .card.card-info {
+        border: 1px solid blue;
+      }
+
+      .card.card-warning {
+        border: 1px solid yellow;
+      }
+      .card .card-title {
+        text-decoration: underline;
+      }
     </style>
   </head>
 
@@ -93,6 +108,21 @@
             <li>a</li>
           </ol>
           This is an ordinary text
+
+          <div class="card card-warning">
+            <h3 class="card-title">This is the title</h3>
+            <p>Hello in the card</p>
+            <ul>
+              <li>Hello</li>
+            </ul>
+
+            <div class="card-body">
+              <ol>
+                <li>This is the first one</li>
+                <li>This is the second one</li>
+              </ol>
+            </div>
+          </div>
         </div>
       </div>
     </div>

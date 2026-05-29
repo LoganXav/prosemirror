@@ -59,13 +59,13 @@ const linkMarkSpec = {
 const listItemNodeSpec = {
   content: "paragraph block*",
   attrs: {},
-  toDOM: (node) => {
+  toDOM: () => {
     return ["li", 0];
   },
   parseDOM: [{ tag: "li" }],
 };
 
-const unorderedListNodeSpec = {
+const bulletListNodeSpec = {
   group: "block",
   content: "list_item+",
   toDOM: () => {
@@ -133,6 +133,52 @@ const headingNodeSpec = {
   ],
 };
 
+const cardSpec = {
+  group: "block",
+  content: "card_title card_body",
+  attrs: {
+    kind: { default: "info", validate: "string" },
+  },
+  toDOM(node) {
+    return ["div", { class: `card card-${node.attrs.kind}` }, 0];
+  },
+  parseDOM: [
+    {
+      tag: "div.card",
+      getAttrs(dom) {
+        const elementClass = dom.hasAttribute("class")
+          ? dom.getAttribute("class")
+          : null;
+
+        const kindClass = elementClass
+          .split(" ")
+          .find((value) => value.startsWith("card-"));
+        const kind = kindClass.split("-")[1];
+
+        return { kind };
+      },
+    },
+  ],
+};
+
+const cardTitleSpec = {
+  group: "block",
+  content: "inline*",
+  toDOM() {
+    return ["h3", { class: "card-title" }, 0];
+  },
+  parseDOM: [{ tag: "h3.card-title" }],
+};
+
+const cardBodySpec = {
+  group: "block",
+  content: "block*",
+  toDOM() {
+    return ["div", { class: "card-body" }, 0];
+  },
+  parseDOM: [{ tag: "div.card-body" }],
+};
+
 const docNodeSpec = {
   content: "block+",
 };
@@ -142,9 +188,12 @@ const nodes = {
   text: textNodeSpec,
   paragraph: paragraphNodeSpec,
   heading: headingNodeSpec,
-  bullet_list: unorderedListNodeSpec,
+  bullet_list: bulletListNodeSpec,
   ordered_list: orderedListNodeSpec,
   list_item: listItemNodeSpec,
+  card: cardSpec,
+  card_body: cardBodySpec,
+  card_title: cardTitleSpec,
 };
 
 const marks = {
@@ -171,29 +220,8 @@ const state = EditorState.create({
   // plugins: [],
 });
 
-const $pos = state.doc.resolve(107);
-
-console.log({
-  depth: $pos.depth,
-  parent: $pos.parent.type.name, // "paragraph"
-  textOffset: $pos.textOffset, // chars from start of current text run
-  nodeBefore: $pos.nodeBefore, // text node before cursor
-  nodeAfter: $pos.nodeAfter, // text node after cursor
-  textBefore: $pos.nodeBefore?.text, // actual string content before
-  textAfter: $pos.nodeAfter?.text, // actual string content after
-});
-
-console.log({
-  start: $pos.start($pos.depth),
-  startResol: state.doc.resolve($pos.start($pos.depth)),
-  end: $pos.end($pos.depth),
-  endResol: state.doc.resolve($pos.end($pos.depth)),
-});
-
-for (let d = 0; d <= $pos.depth; d++) {
-  console.log(`depth ${d}:`, $pos.node(d).type.name);
-}
-
 const view = new EditorView(document.querySelector("#editor"), {
   state,
 });
+
+console.log({ doc: state.doc });
