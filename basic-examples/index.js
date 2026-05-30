@@ -91,6 +91,45 @@ let cursorContextPlugin = new Plugin({
   },
 });
 
+const characterCountPlugin = new Plugin({
+  state: {
+    init(_, state) {
+      return updateCharacterCount(state.doc);
+    },
+
+    apply(tr, value) {
+      return tr.docChanged ? updateCharacterCount(tr.doc) : value;
+    },
+  },
+
+  view(editorView) {
+    const countElement = document.createElement("div");
+    countElement.className = "char-count";
+    document.querySelector("#content-wrapper").appendChild(countElement);
+    function update(view) {
+      const count = characterCountPlugin.getState(view.state);
+      countElement.textContent = `${count} chars`;
+    }
+    update(editorView);
+
+    return {
+      update,
+      destroy() {
+        countElement.remove();
+      },
+    };
+  },
+});
+
+function updateCharacterCount(doc) {
+  let count = 0;
+  doc.descendants((node) => {
+    count += node.isText ? node.text.length : 0;
+  });
+
+  return count;
+}
+
 //   nodes: addListNodes(schema.spec.nodes, "paragraph block*", "block"),
 // const extendedBasicSchema = new Schema({
 //   marks: schema.spec.marks,
@@ -108,7 +147,7 @@ let appState = {
     doc: DOMParser.fromSchema(extendedBasicSchema).parse(
       document.querySelector("#content"),
     ),
-    plugins: [specklePlugin, cursorContextPlugin],
+    plugins: [specklePlugin, cursorContextPlugin, characterCountPlugin],
   }),
 
   // non-editor app state
@@ -379,3 +418,7 @@ appState.editor.doc.resolve(97).nodeAfter.forEach((child, offset, index) => {
 });
 
 // console.log(appState.editor.doc.resolve(28).nodeAfter);
+//
+//
+
+// SOME MORE PLUGINS

@@ -392,7 +392,7 @@ function insertCallout(kind = "info") {
 
 function updateWordCount(tr) {
   let wordCount = 0;
-  const doc = view.state.doc;
+  const doc = tr.doc;
   doc.descendants((node, pos, parent) => {
     if (node.isText) {
       wordCount += node.text.split(" ").filter((word) => word != "").length;
