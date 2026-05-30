@@ -188,6 +188,44 @@ const cardBodySpec = {
 const docNodeSpec = {
   content: "block+",
 };
+const calloutNodeSpec = {
+  group: "block",
+  content: "callout_title callout_body", // strict sequence, always both
+  attrs: {
+    kind: { default: "info" }, // info | warning | danger
+  },
+  toDOM(node) {
+    return [
+      "div",
+      {
+        class: `callout callout-${node.attrs.kind}`,
+        "data-kind": node.attrs.kind,
+      },
+      0,
+    ];
+  },
+  parseDOM: [
+    {
+      tag: "div.callout",
+      getAttrs: (dom) => ({
+        kind: dom.getAttribute("data-kind") || "info",
+      }),
+    },
+  ],
+};
+
+const calloutTitleNodeSpec = {
+  content: "inline*",
+  defining: true, // copy-paste keeps this node intact
+  toDOM: () => ["p", { class: "callout-title" }, 0],
+  parseDOM: [{ tag: "p.callout-title" }],
+};
+
+const calloutBodyNodeSpec = {
+  content: "block+", // one or more blocks — allows nested callouts
+  toDOM: () => ["div", { class: "callout-body" }, 0],
+  parseDOM: [{ tag: "div.callout-body" }],
+};
 
 const nodes = {
   doc: docNodeSpec,
@@ -200,6 +238,9 @@ const nodes = {
   card: cardSpec,
   card_body: cardBodySpec,
   card_title: cardTitleSpec,
+  callout: calloutNodeSpec,
+  callout_title: calloutTitleNodeSpec,
+  callout_body: calloutBodyNodeSpec,
 };
 
 const marks = {
@@ -213,46 +254,7 @@ const marks = {
 // });
 
 const extendedBasicSchema = new Schema({
-  nodes: schema.spec.nodes.append({
-    callout: {
-      group: "block",
-      content: "callout_title callout_body", // strict sequence, always both
-      attrs: {
-        kind: { default: "info" }, // info | warning | danger
-      },
-      toDOM(node) {
-        return [
-          "div",
-          {
-            class: `callout callout-${node.attrs.kind}`,
-            "data-kind": node.attrs.kind,
-          },
-          0,
-        ];
-      },
-      parseDOM: [
-        {
-          tag: "div.callout",
-          getAttrs: (dom) => ({
-            kind: dom.getAttribute("data-kind") || "info",
-          }),
-        },
-      ],
-    },
-
-    callout_title: {
-      content: "inline*",
-      defining: true, // copy-paste keeps this node intact
-      toDOM: () => ["p", { class: "callout-title" }, 0],
-      parseDOM: [{ tag: "p.callout-title" }],
-    },
-
-    callout_body: {
-      content: "block+", // one or more blocks — allows nested callouts
-      toDOM: () => ["div", { class: "callout-body" }, 0],
-      parseDOM: [{ tag: "div.callout-body" }],
-    },
-  }),
+  nodes,
   // marks: schema.spec.marks,
   marks,
 });
@@ -274,6 +276,12 @@ const view = new EditorView(document.querySelector("#editor"), {
   state,
   nodeViews: {
     callout: (node, view, getPos) => new CalloutNodeView(node, view, getPos),
+  },
+
+  dispatchTransaction(transaction) {
+    transaction.docChanged && updateWordCount(transaction);
+    const newState = view.state.apply(transaction);
+    view.updateState(newState);
   },
 });
 
@@ -304,7 +312,6 @@ document.querySelector("#card").addEventListener("click", () => {
   );
 
   const { $cursor } = view.state.selection;
-  // console.log({ currentPoos: $cursor.pos, after: $cursor.after(1) });
 
   const insertPos = $cursor.after(1);
   const step = new ReplaceStep(insertPos, insertPos, slice);
@@ -377,8 +384,19 @@ function insertCallout(kind = "info") {
     const tr = state.tr.replaceSelectionWith(node);
 
     // Move cursor inside the title
-    const titleStart = $from.pos + 2; // +1 for callout open, +1 for title open
+    const titleStart = $from.pos + 1; // +1 for callout open, +1 for title open
     dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(titleStart))));
     return true;
   };
+}
+
+function updateWordCount(tr) {
+  let wordCount = 0;
+  const doc = view.state.doc;
+  doc.descendants((node, pos, parent) => {
+    if (node.isText) {
+      wordCount += node.text.split(" ").filter((word) => word != "").length;
+    }
+  });
+  console.log({ wordCount });
 }
