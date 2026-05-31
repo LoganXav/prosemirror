@@ -1,4 +1,4 @@
-import { EditorState, Plugin } from "prosemirror-state";
+import { EditorState, Plugin, PluginKey } from "prosemirror-state";
 import { addListNodes } from "prosemirror-schema-list";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { schema } from "prosemirror-schema-basic";
@@ -28,6 +28,80 @@ let specklePlugin = new Plugin({
     },
   },
 });
+
+const highlightKey = new PluginKey("highlight");
+
+const highllightPlugin = new Plugin({
+  key: highlightKey,
+
+  state: {
+    init(_, state) {
+      const decorations = buildHighlightDecorations(state.doc);
+      return DecorationSet.create(state.doc, decorations);
+    },
+    apply(tr, set) {
+      // if (!tr.docChanged) {
+      //   return set;
+      // }
+      // return DecorationSet.create(tr.doc, buildHighlightDecorations(tr.doc));
+      const newDecorations = tr.getMeta(highlightKey);
+      if (newDecorations) {
+        return DecorationSet.create(tr.doc, newDecorations);
+      }
+
+      return tr.docChanged ? set.map(tr.mapping, tr.doc) : set;
+    },
+  },
+
+  view(editorView) {
+    return {
+      update(view) {
+        scheduleRebuild(editorView);
+      },
+    };
+  },
+
+  props: {
+    decorations(state) {
+      return highlightKey.getState(state);
+    },
+  },
+});
+
+let rebuildTimer;
+function scheduleRebuild(view) {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => {
+    const decorations = buildHighlightDecorations(view.state.doc);
+    view.dispatch(view.state.tr.setMeta(highlightKey, decorations));
+  }, 300);
+}
+
+function buildHighlightDecorations(doc) {
+  let decorations = [];
+
+  doc.descendants((node, pos) => {
+    if (node.isText) {
+      const regex = /\btodo\b/gi;
+      let match = regex.exec(node.text);
+
+      while (match !== null) {
+        decorations.push(
+          Decoration.inline(
+            pos + match.index,
+            pos + match.index + match[0].length,
+            { style: "background: green" },
+          ),
+        );
+        // regex.exec returns a stateful result that given the same string, keeps track if the last index a match was found so it is able to
+        // macth the next occurence of the pattern
+        match = regex.exec(node.text);
+      }
+    }
+  });
+
+  return decorations;
+}
 
 // Resolved position examples plugin.
 // state.selection.$from and $to are already resolved positions — no need to call doc.resolve() manually.
@@ -59,7 +133,7 @@ let cursorContextPlugin = new Plugin({
       // $from.parent is the immediate containing node (same as $from.node($from.depth))
       const parent = $from.parent.type.name;
 
-      // $from.textOffset is how far into the current text node the cursor is
+      // $from.textOffset how far into the current text node the cursor is
       const textOffset = $from.textOffset;
 
       // $from.start() and $from.end() give the absolute positions bounding the parent node
@@ -106,6 +180,7 @@ const characterCountPlugin = new Plugin({
     const countElement = document.createElement("div");
     countElement.className = "char-count";
     document.querySelector("#content-wrapper").appendChild(countElement);
+
     function update(view) {
       const count = characterCountPlugin.getState(view.state);
       countElement.textContent = `${count} chars`;
@@ -147,7 +222,12 @@ let appState = {
     doc: DOMParser.fromSchema(extendedBasicSchema).parse(
       document.querySelector("#content"),
     ),
-    plugins: [specklePlugin, cursorContextPlugin, characterCountPlugin],
+    plugins: [
+      // specklePlugin,
+      cursorContextPlugin,
+      characterCountPlugin,
+      highllightPlugin,
+    ],
   }),
 
   // non-editor app state
@@ -385,7 +465,7 @@ appState.editor.doc.descendants((node, pos, parent) => {
     parent.type !== extendedBasicSchema.nodes.blockquote
   ) {
     count++;
-    // keep in mind the pos is the one before the node's opening token
+    // keep in mind the pos is the one before the node's opening token unless node.isText which is inline with no open tokens
     const $from = appState.editor.doc.resolve(pos + 1);
     positions[count] = {
       startingFrom: $from.start(),

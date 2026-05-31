@@ -398,5 +398,5 @@ function updateWordCount(tr) {
       wordCount += node.text.split(" ").filter((word) => word != "").length;
     }
   });
-  console.log({ wordCount });
+  // console.log({ wordCount });
 }
