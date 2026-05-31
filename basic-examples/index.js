@@ -29,6 +29,50 @@ let specklePlugin = new Plugin({
   },
 });
 
+const nodeHighlightPluginKey = new PluginKey("node-highlight");
+
+const nodeHighlightPlugin = new Plugin({
+  key: nodeHighlightPluginKey,
+  state: {
+    init() {
+      return DecorationSet.empty;
+    },
+    apply(tr, set) {
+      if (tr.docChanged || tr.selectionSet) {
+        const { $from } = tr.selection;
+        const decoration = highlightCurrentNode($from, tr.doc);
+
+        const newSet = DecorationSet.create(tr.doc, decoration);
+        return newSet === set ? set : newSet;
+      }
+      return set;
+    },
+  },
+
+  props: {
+    decorations(state) {
+      return nodeHighlightPluginKey.getState(state);
+    },
+  },
+});
+
+function highlightCurrentNode($from, doc) {
+  let decoration = [];
+  doc.descendants((node, pos, parent) => {
+    if (parent.type === extendedBasicSchema.nodes.doc) {
+      if ($from.pos > pos && $from.pos < pos + node.nodeSize) {
+        decoration.push(
+          Decoration.node(pos, pos + node.nodeSize, {
+            style: "border: 2px solid red",
+          }),
+        );
+      }
+    }
+    return false;
+  });
+  return decoration;
+}
+
 const highlightKey = new PluginKey("highlight");
 
 const highllightPlugin = new Plugin({
@@ -40,10 +84,6 @@ const highllightPlugin = new Plugin({
       return DecorationSet.create(state.doc, decorations);
     },
     apply(tr, set) {
-      // if (!tr.docChanged) {
-      //   return set;
-      // }
-      // return DecorationSet.create(tr.doc, buildHighlightDecorations(tr.doc));
       const newDecorations = tr.getMeta(highlightKey);
       if (newDecorations) {
         return DecorationSet.create(tr.doc, newDecorations);
@@ -227,6 +267,7 @@ let appState = {
       cursorContextPlugin,
       characterCountPlugin,
       highllightPlugin,
+      nodeHighlightPlugin,
     ],
   }),
 
@@ -408,11 +449,11 @@ const view = new EditorView(document.querySelector("#editor"), {
   state: appState.editor,
 
   // node view register
-  nodeViews: {
-    paragraph(node, view, getPos) {
-      return new ParagraphView(node, view, getPos);
-    },
-  },
+  // nodeViews: {
+  //   paragraph(node, view, getPos) {
+  //     return new ParagraphView(node, view, getPos);
+  //   },
+  // },
 
   dispatchTransaction(transaction) {
     dispatch({
