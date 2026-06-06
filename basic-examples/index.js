@@ -40,7 +40,10 @@ const nodeHighlightPlugin = new Plugin({
     apply(tr, set) {
       if (tr.docChanged || tr.selectionSet) {
         const { $from } = tr.selection;
-        const decoration = highlightCurrentNode($from, tr.doc);
+        const from = $from.before(1);
+        const to = $from.after(1);
+        const decoration = highlightCurrentNode(from, to, tr.doc);
+        // const decoration = highlightCurrentNode($from, tr.doc);
 
         const newSet = DecorationSet.create(tr.doc, decoration);
         return newSet === set ? set : newSet;
@@ -56,19 +59,28 @@ const nodeHighlightPlugin = new Plugin({
   },
 });
 
-function highlightCurrentNode($from, doc) {
+function highlightCurrentNode(from, to, doc) {
+  // function highlightCurrentNode($from, doc) {
   let decoration = [];
-  doc.descendants((node, pos, parent) => {
-    if (parent.type === extendedBasicSchema.nodes.doc) {
-      if ($from.pos > pos && $from.pos < pos + node.nodeSize) {
-        decoration.push(
-          Decoration.node(pos, pos + node.nodeSize, {
-            style: "border: 2px solid red",
-          }),
-        );
-      }
-    }
-    return false;
+  // doc.descendants((node, pos, parent) => {
+  //   if (parent.type === extendedBasicSchema.nodes.doc) {
+  //     if ($from.pos > pos && $from.pos < pos + node.nodeSize) {
+  //       decoration.push(
+  //         Decoration.node(pos, pos + node.nodeSize, {
+  //           style: "border: 2px solid red",
+  //         }),
+  //       );
+  //     }
+  //   }
+  //   return false;
+  // });
+
+  doc.nodesBetween(from, to, (node, pos) => {
+    decoration.push(
+      Decoration.node(from, to, {
+        style: "border: 2px solid purple",
+      }),
+    );
   });
   return decoration;
 }
@@ -93,10 +105,11 @@ const highllightPlugin = new Plugin({
     },
   },
 
-  view(editorView) {
+  view() {
     return {
-      update(view) {
-        scheduleRebuild(editorView);
+      update(view, prevState) {
+        if (view.state.doc.eq(prevState.doc)) return;
+        scheduleRebuild(view);
       },
     };
   },
@@ -123,9 +136,10 @@ function buildHighlightDecorations(doc) {
   doc.descendants((node, pos) => {
     if (node.isText) {
       const regex = /\btodo\b/gi;
-      let match = regex.exec(node.text);
+      // let match = regex.exec(node.text);
+      let match;
 
-      while (match !== null) {
+      while ((match = regex.exec(node.text)) !== null) {
         decorations.push(
           Decoration.inline(
             pos + match.index,
@@ -133,9 +147,10 @@ function buildHighlightDecorations(doc) {
             { style: "background: green" },
           ),
         );
-        // regex.exec returns a stateful result that given the same string, keeps track if the last index a match was found so it is able to
+        // regex.exec returns a stateful result that given the same string,
+        // keeps track if the last index a match was found so it is able to
         // macth the next occurence of the pattern
-        match = regex.exec(node.text);
+        // match = regex.exec(node.text); --- i replaced this with the assignment syntax in the predicate
       }
     }
   });
@@ -154,37 +169,43 @@ let cursorContextPlugin = new Plugin({
       "padding: 6px 10px; font-size: 12px; color: #444; border: 1px solid #ddd; margin-top: 8px; font-family: monospace;";
     editorView.dom.parentNode.appendChild(status);
 
-    function update(view) {
-      const { $from, $cursor } = view.state.selection;
+    // considering the update only runs after the first transaction,
+    // if i want the plugin view to render on page load, I can extract the update fuction as it;s own
+    // function that is called seperate from the one returned (like below). This works because the view renders
+    // the view immwdiately the state is ready even before the first transaction
+    // update(editorView);
+    return {
+      update(view) {
+        const { $from, $cursor } = view.state.selection;
 
-      // Build the ancestor path from doc down to the cursor's parent
-      const path = [];
-      let ancestorBefore = 0;
-      let ancestorAfter = 0;
-      for (let d = 0; d <= $from.depth; d++) {
-        path.push($from.node(d).type.name);
+        // Build the ancestor path from doc down to the cursor's parent
+        const path = [];
+        let ancestorBefore = 0;
+        let ancestorAfter = 0;
+        for (let d = 0; d <= $from.depth; d++) {
+          path.push($from.node(d).type.name);
 
-        if (d !== 0) {
-          ancestorBefore = $from.before(d);
-          ancestorAfter = $from.after(d);
+          if (d !== 0) {
+            ancestorBefore = $from.before(d);
+            ancestorAfter = $from.after(d);
+          }
         }
-      }
 
-      // $from.parent is the immediate containing node (same as $from.node($from.depth))
-      const parent = $from.parent.type.name;
+        // $from.parent is the immediate containing node (same as $from.node($from.depth))
+        const parent = $from.parent.type.name;
 
-      // $from.textOffset how far into the current text node the cursor is
-      const textOffset = $from.textOffset;
+        // $from.textOffset how far into the current text node the cursor is
+        const textOffset = $from.textOffset;
 
-      // $from.start() and $from.end() give the absolute positions bounding the parent node
-      const parentStart = $from.start();
-      const parentEnd = $from.end();
+        // $from.start() and $from.end() give the absolute positions bounding the parent node
+        const parentStart = $from.start();
+        const parentEnd = $from.end();
 
-      // nodeBefore/nodeAfter are the nodes immediately before/after the cursor within the parent
-      const before = $from.nodeBefore ? $from.nodeBefore.type.name : "none";
-      const after = $from.nodeAfter ? $from.nodeAfter.type.name : "none";
+        // nodeBefore/nodeAfter are the nodes immediately before/after the cursor within the parent
+        const before = $from.nodeBefore ? $from.nodeBefore.type.name : "none";
+        const after = $from.nodeAfter ? $from.nodeAfter.type.name : "none";
 
-      status.innerHTML = `
+        status.innerHTML = `
         <b>path:</b> ${path.join(" &rsaquo; ")} |
         <b>pos:</b> ${$from.pos} |
 
@@ -198,10 +219,8 @@ let cursorContextPlugin = new Plugin({
         <b>nodeBefore:</b> ${before} |
         <b>nodeAfter:</b> ${after}
       `;
-    }
-
-    update(editorView);
-    return { update };
+      },
+    };
   },
 });
 
@@ -216,19 +235,16 @@ const characterCountPlugin = new Plugin({
     },
   },
 
-  view(editorView) {
+  view() {
     const countElement = document.createElement("div");
     countElement.className = "char-count";
     document.querySelector("#content-wrapper").appendChild(countElement);
 
-    function update(view) {
-      const count = characterCountPlugin.getState(view.state);
-      countElement.textContent = `${count} chars`;
-    }
-    update(editorView);
-
     return {
-      update,
+      update(view) {
+        const count = characterCountPlugin.getState(view.state);
+        countElement.textContent = `${count} chars`;
+      },
       destroy() {
         countElement.remove();
       },
@@ -444,16 +460,82 @@ class ParagraphView {
   }
 }
 
+class CodeBlockView {
+  constructor(node, view, getPos) {
+    this.view = view;
+    this.node = node;
+    this.getPos = getPos;
+
+    // creating the outer wrapper
+    this.dom = document.createElement("div");
+    this.dom.className = "code-block";
+
+    // creating the language selector
+    this.select = document.createElement("select");
+    this.select.className = "code-lang";
+    ["javascript", "golang", "python", "rust"].forEach((lang) => {
+      const option = document.createElement("option");
+      option.value = option.textContent = lang;
+      this.select.appendChild(option);
+    });
+
+    this.select.value = node.attrs.params || "javascript";
+    this.select.addEventListener("change", () => this.selectLanguage());
+    this.dom.appendChild(this.select);
+
+    // creating the content of the code block
+    this.code = document.createElement("code");
+    this.contentDOM = this.code;
+
+    const pre = document.createElement("pre");
+    pre.appendChild(this.code);
+    this.dom.appendChild(pre);
+  }
+
+  selectLanguage() {
+    const params = this.select.value;
+
+    // changes the attrs of the code_block
+    const tr = this.view.state.tr.setNodeMarkup(this.getPos(), null, {
+      ...this.node.attrs,
+      params,
+    });
+    this.view.dispatch(tr);
+  }
+
+  update(node) {
+    if (this.node.type !== node.type) return false;
+
+    this.node = node;
+
+    // if attrs changed, sync the select field
+    if (node.attrs.params !== this.select.value) {
+      this.select.value = node.attrs.params;
+    }
+
+    return true;
+  }
+
+  ignoreMutation(mutation) {
+    console.log({ mutation });
+    // Ignore mutations to the select element — PM doesn't own it
+    return this.select.contains(mutation.target);
+  }
+}
+
 const view = new EditorView(document.querySelector("#editor"), {
   // editor state
   state: appState.editor,
 
   // node view register
-  // nodeViews: {
-  //   paragraph(node, view, getPos) {
-  //     return new ParagraphView(node, view, getPos);
-  //   },
-  // },
+  nodeViews: {
+    paragraph(node, view, getPos) {
+      return new ParagraphView(node, view, getPos);
+    },
+    code_block(node, view, getPos) {
+      return new CodeBlockView(node, view, getPos);
+    },
+  },
 
   dispatchTransaction(transaction) {
     dispatch({

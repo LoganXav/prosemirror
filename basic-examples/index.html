@@ -70,6 +70,40 @@
       .char-count {
         padding: 10px;
       }
+
+      .code-block {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        overflow: hidden;
+        margin: 12px 0;
+        background: #1e1e1e;
+      }
+
+      .code-lang {
+        display: block;
+        width: 100%;
+        padding: 6px 10px;
+        background: #2d2d2d;
+        color: #ccc;
+        border: none;
+        border-bottom: 1px solid #444;
+        font-size: 12px;
+        cursor: pointer;
+        outline: none;
+      }
+
+      .code-block pre {
+        margin: 0;
+        padding: 16px;
+        overflow-x: auto;
+      }
+
+      .code-block code {
+        color: #f8f8f2;
+        font-family: monospace;
+        font-size: 14px;
+        white-space: pre;
+      }
     </style>
   </head>
 
@@ -102,6 +136,9 @@
           <li>A list item 3</li>
         </ol>
         <p>Last paragraph <b>text here.</b></p>
+        <pre><code>function hello() {
+  console.log("hello world");
+}</code></pre>
       </div>
     </div>
     <div class="controls">
